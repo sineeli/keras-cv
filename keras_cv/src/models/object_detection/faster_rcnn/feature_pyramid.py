@@ -100,6 +100,7 @@ class FeaturePyramid(keras.layers.Layer):
         self,
         min_level,
         max_level,
+        backbone_max_level,
         num_channels=256,
         lateral_layers=None,
         output_layers=None,
@@ -108,8 +109,9 @@ class FeaturePyramid(keras.layers.Layer):
         super().__init__(**kwargs)
         self.min_level = min_level
         self.max_level = max_level
+        self.backbone_max_level = backbone_max_level
         self.pyramid_levels = [
-            f"P{level}" for level in range(min_level, max_level + 1)
+            f"P{level}" for level in range(min_level, backbone_max_level + 1)
         ]
         self.num_channels = num_channels
 
@@ -120,8 +122,8 @@ class FeaturePyramid(keras.layers.Layer):
         if not lateral_layers:
             # populate self.lateral_ops with default FPN Conv2D 1X1 layers
             self.lateral_layers = {}
-            for i in self.pyramid_levels:
-                self.lateral_layers[i] = keras.layers.Conv2D(
+            for i in range(min_level, backbone_max_level + 1):
+                self.lateral_layers[f"P{i}"] = keras.layers.Conv2D(
                     self.num_channels,
                     kernel_size=1,
                     strides=1,
@@ -135,8 +137,8 @@ class FeaturePyramid(keras.layers.Layer):
         # Output conv2d layers.
         if not output_layers:
             self.output_layers = {}
-            for i in self.pyramid_levels:
-                self.output_layers[i] = keras.layers.Conv2D(
+            for i in range(min_level, backbone_max_level + 1):
+                self.output_layers[f"P{i}"] = keras.layers.Conv2D(
                     self.num_channels,
                     kernel_size=3,
                     strides=1,
@@ -153,19 +155,13 @@ class FeaturePyramid(keras.layers.Layer):
         #     pool_size=(1, 1), strides=2, padding="same"
         # )
 
-        self.coarser_conv1 = keras.layers.Conv2D(
-            self.num_channels,
-            strides=2,
-            kernel_size=3,
-            padding="same"
-        )
+        self.coarser_convs = {}
         self.activation = keras.layers.Activation("relu")
-        self.coarser_conv2 = keras.layers.Conv2D(
-            self.num_channels,
-            strides=2,
-            kernel_size=3,
-            padding="same"
-        ) 
+        for i in range(backbone_max_level + 1, max_level + 1):
+            conv = keras.layers.Conv2D(
+                self.num_channels, strides=2, kernel_size=3, padding="same"
+            )
+            self.coarser_convs[f"P{i}"] = conv
 
         # the same upsampling layer is used for all levels
         self.top_down_op = keras.layers.UpSampling2D(size=2)
@@ -203,7 +199,7 @@ class FeaturePyramid(keras.layers.Layer):
         #                                                       output_l6
         #                                                         ^
         #                                                         |
-        #                                                       max_pool_2d
+        #                                                       conv2d[x1, x2]
         #                                                         ^
         #                                                         |
         # input_l5 -> conv2d_1x1_l5 ----V---> conv2d_3x3_l5 -> output_l5
@@ -222,10 +218,10 @@ class FeaturePyramid(keras.layers.Layer):
         output_features = {}
         reversed_levels = list(sorted(input_features.keys(), reverse=True))
 
-        for i in range(self.max_level, self.min_level - 1, -1):
+        for i in range(self.backbone_max_level, self.min_level - 1, -1):
             level = f"P{i}"
             output = self.lateral_layers[level](input_features[level])
-            if i < self.max_level:
+            if i < self.backbone_max_level:
                 # for the top most output, it doesn't need to merge with any
                 # upper stream outputs
                 upstream_output = self.top_down_op(output_features[f"P{i + 1}"])
@@ -238,16 +234,13 @@ class FeaturePyramid(keras.layers.Layer):
             output_features[level] = self.output_layers[level](
                 output_features[level]
             )
-        # output_features[f"P{self.max_level + 1}"] = self.max_pool(
-        #     output_features[f"P{self.max_level}"]
-        # )
 
-        output_features[f"P{self.max_level + 1}"] = self.coarser_conv1(
-            output_features[f"P{self.max_level}"]
-        )
-        output_features[f"P{self.max_level + 2}"] = self.coarser_conv2(
-            self.activation(output_features[f"P{self.max_level + 1}"])
-        )
+        for i in range(self.backbone_max_level + 1, self.max_level + 1):
+            level = f"P{i}"
+            feats_in = output_features[f"P{i-1}"]
+            if i > self.backbone_max_level + 1:
+                feats_in = self.activation(feats_in)
+            output_features[f"P{i}"] = self.coarser_convs[level](feats_in)
 
         output_features = OrderedDict(sorted(output_features.items()))
         return output_features
@@ -256,6 +249,7 @@ class FeaturePyramid(keras.layers.Layer):
         config = super().get_config()
         config["min_level"] = self.min_level
         config["max_level"] = self.max_level
+        config["backbone_max_level"] = self.backbone_max_level
         config["num_channels"] = self.num_channels
         config["lateral_layers"] = self.lateral_layers
         config["output_layers"] = self.output_layers
@@ -270,5 +264,7 @@ class FeaturePyramid(keras.layers.Layer):
         for level in self.pyramid_levels:
             self.output_layers[level].build((None, None, None, 256))
         # self.max_pool.build((None, None, None, 256))
-        self.coarser_conv1.build((None, None, None, 256))
+        for i in range(self.backbone_max_level + 1, self.max_level + 1):
+            level = f"P{i}"
+            self.coarser_convs[level].build((None, None, None, 256))
         self.built = True

@@ -167,8 +167,8 @@ class FasterRCNN(Task):
         anchor_scales=[1],
         anchor_aspect_ratios=[0.5, 1.0, 2.0],
         feature_pyramid=None,
-        fpn_min_level=2,
-        fpn_max_level=5,
+        min_level=2,
+        max_level=6,
         rpn_head=None,
         rpn_filters=256,
         rpn_kernel_size=3,
@@ -185,8 +185,10 @@ class FasterRCNN(Task):
         **kwargs,
     ):
         # Backbone
+        backbone_levels = [int(lvl[1]) for lvl in backbone.pyramid_level_inputs]
+        backbone_max_level = min(int(max(backbone_levels)), max_level)
         extractor_levels = [
-            f"P{level}" for level in range(fpn_min_level, fpn_max_level + 1)
+            f"P{level}" for level in range(min_level, backbone_max_level + 1)
         ]
         extractor_layer_names = [
             backbone.pyramid_level_inputs[i] for i in extractor_levels
@@ -197,15 +199,17 @@ class FasterRCNN(Task):
 
         # Feature Pyramid
         feature_pyramid = feature_pyramid or FeaturePyramid(
-            min_level=fpn_min_level, max_level=fpn_max_level
+            min_level=min_level,
+            max_level=max_level,
+            backbone_max_level=backbone_max_level,
         )
 
         # Anchors
         anchor_generator = (
             anchor_generator
             or FasterRCNN.default_anchor_generator(
-                fpn_min_level,
-                fpn_max_level + 1,
+                min_level,
+                max_level,
                 anchor_scales,
                 anchor_aspect_ratios,
                 "yxyx",
@@ -291,9 +295,7 @@ class FasterRCNN(Task):
         rois, roi_scores = roi_generator(decoded_rpn_boxes, rpn_scores)
         rois = _clip_boxes(rois, "yxyx", image_shape)
 
-        feature_map = roi_aligner(
-            features=feature_map, boxes=rois
-        )
+        feature_map = roi_aligner(features=feature_map, boxes=rois)
 
         # Reshape the feature map [BS, H*W*K]
         feature_map = keras.layers.Reshape(
