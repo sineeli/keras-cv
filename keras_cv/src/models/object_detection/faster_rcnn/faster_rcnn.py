@@ -291,7 +291,9 @@ class FasterRCNN(Task):
         rois, roi_scores = roi_generator(decoded_rpn_boxes, rpn_scores)
         rois = _clip_boxes(rois, "yxyx", image_shape)
 
-        feature_map = roi_aligner(features=feature_map, boxes=rois)
+        feature_map = roi_aligner(
+            features=feature_map.pop(f"{fpn_max_level+1}"), boxes=rois
+        )
 
         # Reshape the feature map [BS, H*W*K]
         feature_map = keras.layers.Reshape(
