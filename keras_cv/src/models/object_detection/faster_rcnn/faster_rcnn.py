@@ -292,7 +292,7 @@ class FasterRCNN(Task):
         rois = _clip_boxes(rois, "yxyx", image_shape)
 
         feature_map = roi_aligner(
-            features=feature_map.pop(f"{fpn_max_level+1}"), boxes=rois
+            features=feature_map.pop(f"P{fpn_max_level+1}"), boxes=rois
         )
 
         # Reshape the feature map [BS, H*W*K]
@@ -543,7 +543,7 @@ class FasterRCNN(Task):
 
         # Call RoI Aligner and RCNN Head
         feature_map = self.roi_aligner(
-            features=feature_map.pop(f"{self.feature_pyramid.max_level+1}"),
+            features=feature_map.pop(f"P{self.feature_pyramid.max_level+1}"),
             boxes=rois,
         )
 
