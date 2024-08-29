@@ -542,7 +542,10 @@ class FasterRCNN(Task):
         cls_targets = ops.one_hot(cls_targets, num_classes=self.num_classes + 1)
 
         # Call RoI Aligner and RCNN Head
-        feature_map = self.roi_aligner(features=feature_map, boxes=rois)
+        feature_map = self.roi_aligner(
+            features=feature_map.pop(f"{self.feature_pyramid.max_level+1}"),
+            boxes=rois,
+        )
 
         # [BS, H*W*K]
         feature_map = ops.reshape(
