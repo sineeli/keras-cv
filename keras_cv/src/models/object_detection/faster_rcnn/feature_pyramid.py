@@ -158,6 +158,13 @@ class FeaturePyramid(keras.layers.Layer):
             strides=2,
             kernel_size=3,
             padding="same"
+        )
+        self.activation = keras.layers.Activation("relu")
+        self.coarser_conv2 = keras.layers.Conv2D(
+            self.num_channels,
+            strides=2,
+            kernel_size=3,
+            padding="same"
         ) 
 
         # the same upsampling layer is used for all levels
@@ -237,6 +244,9 @@ class FeaturePyramid(keras.layers.Layer):
 
         output_features[f"P{self.max_level + 1}"] = self.coarser_conv1(
             output_features[f"P{self.max_level}"]
+        )
+        output_features[f"P{self.max_level + 2}"] = self.coarser_conv2(
+            self.activation(output_features[f"P{self.max_level + 1}"])
         )
 
         output_features = OrderedDict(sorted(output_features.items()))
