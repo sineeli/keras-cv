@@ -149,9 +149,16 @@ class FeaturePyramid(keras.layers.Layer):
         # Applies a max_pool2d (not actual max_pool2d, we just subsample) on
         # top of the last feature map
         # Use max pooling to simulate stride 2 subsampling
-        self.max_pool = keras.layers.MaxPool2D(
-            pool_size=(1, 1), strides=2, padding="same"
-        )
+        # self.max_pool = keras.layers.MaxPool2D(
+        #     pool_size=(1, 1), strides=2, padding="same"
+        # )
+
+        self.coarser_conv1 = keras.layers.Conv2D(
+            self.num_channels,
+            strides=2,
+            kernel_size=3,
+            padding="same"
+        ) 
 
         # the same upsampling layer is used for all levels
         self.top_down_op = keras.layers.UpSampling2D(size=2)
@@ -224,9 +231,14 @@ class FeaturePyramid(keras.layers.Layer):
             output_features[level] = self.output_layers[level](
                 output_features[level]
             )
-        output_features[f"P{self.max_level + 1}"] = self.max_pool(
+        # output_features[f"P{self.max_level + 1}"] = self.max_pool(
+        #     output_features[f"P{self.max_level}"]
+        # )
+
+        output_features[f"P{self.max_level + 1}"] = self.coarser_conv1(
             output_features[f"P{self.max_level}"]
         )
+
         output_features = OrderedDict(sorted(output_features.items()))
         return output_features
 
@@ -247,5 +259,6 @@ class FeaturePyramid(keras.layers.Layer):
 
         for level in self.pyramid_levels:
             self.output_layers[level].build((None, None, None, 256))
-        self.max_pool.build((None, None, None, 256))
+        # self.max_pool.build((None, None, None, 256))
+        self.coarser_conv1.build((None, None, None, 256))
         self.built = True

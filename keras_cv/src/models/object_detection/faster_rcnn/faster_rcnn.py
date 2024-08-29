@@ -291,7 +291,6 @@ class FasterRCNN(Task):
         rois, roi_scores = roi_generator(decoded_rpn_boxes, rpn_scores)
         rois = _clip_boxes(rois, "yxyx", image_shape)
 
-        feature_map.pop(f"P{fpn_max_level+1}")
         feature_map = roi_aligner(
             features=feature_map, boxes=rois
         )
@@ -543,7 +542,6 @@ class FasterRCNN(Task):
         cls_targets = ops.one_hot(cls_targets, num_classes=self.num_classes + 1)
 
         # Call RoI Aligner and RCNN Head
-        feature_map.pop(f"P{self.feature_pyramid.max_level+1}")
         feature_map = self.roi_aligner(
             features=feature_map,
             boxes=rois,
