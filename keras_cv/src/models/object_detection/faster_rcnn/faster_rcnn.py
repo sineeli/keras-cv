@@ -298,12 +298,12 @@ class FasterRCNN(Task):
         feature_map = roi_aligner(features=feature_map, boxes=rois)
 
         # Reshape the feature map [BS, H*W*K]
-        feature_map = keras.layers.Reshape(
-            target_shape=(
-                rois.shape[1],
-                (roi_aligner.target_size**2) * rpn_head.num_filters,
-            )
-        )(feature_map)
+        # feature_map = keras.layers.Reshape(
+        #     target_shape=(
+        #         rois.shape[1],
+        #         (roi_aligner.target_size**2) * rpn_head.num_filters,
+        #     )
+        # )(feature_map)
 
         # Pass final feature map to RCNN Head for predictions
         box_pred, cls_pred = rcnn_head(feature_map=feature_map)
@@ -547,12 +547,6 @@ class FasterRCNN(Task):
         feature_map = self.roi_aligner(
             features=feature_map,
             boxes=rois,
-        )
-
-        # [BS, H*W*K]
-        feature_map = ops.reshape(
-            feature_map,
-            newshape=ops.shape(rois)[:2] + (-1,),
         )
 
         # [BS, H*W*K, 4], [BS, H*W*K, num_classes + 1]
