@@ -59,7 +59,7 @@ class RCNNHead(keras.layers.Layer):
             self.fcs.append(layer)
 
         self.box_pred = keras.layers.Dense(
-            units=4,
+            units=4 * (num_classes + 1),
         )
         self.cls_score = keras.layers.Dense(
             units=num_classes + 1,
@@ -106,7 +106,7 @@ class RCNNHead(keras.layers.Layer):
         self.built = True
 
     def compute_output_shape(self, input_shape):
-        return (None, None, 4), (
+        return (None, None, 4 * (self.num_classes + 1)), (
             None,
             None,
             (self.num_classes + 1),

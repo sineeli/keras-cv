@@ -552,6 +552,12 @@ class FasterRCNN(Task):
         # [BS, H*W*K, 4], [BS, H*W*K, num_classes + 1]
         box_pred, cls_pred = self.rcnn_head(feature_map=feature_map)
 
+        _, num_rois, _ = box_pred.shape
+        box_pred = ops.reshape(
+            box_pred, [-1, num_rois, (self.num_classes + 1), 4]
+        )
+        box_pred = ops.einsum("bnij,bni->bnj", box_pred, cls_targets)
+
         y_true = {
             "rpn_box": rpn_box_targets,
             "rpn_classification": rpn_cls_targets,
