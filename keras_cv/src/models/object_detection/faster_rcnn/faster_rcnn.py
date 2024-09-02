@@ -25,15 +25,13 @@ from keras_cv.src.layers.object_detection.anchor_generator import (
     AnchorGenerator,
 )
 from keras_cv.src.layers.object_detection.box_matcher import BoxMatcher
-from keras_cv.src.layers.object_detection.non_max_suppression import (
-    NonMaxSuppression,
-)
 from keras_cv.src.layers.object_detection.roi_align import ROIAligner
 from keras_cv.src.layers.object_detection.roi_generator import ROIGenerator
 from keras_cv.src.layers.object_detection.roi_sampler import ROISampler
 from keras_cv.src.layers.object_detection.rpn_label_encoder import (
     RpnLabelEncoder,
 )
+from keras_cv.src.models.object_detection.faster_rcnn import DetectionGenerator
 from keras_cv.src.models.object_detection.faster_rcnn import FeaturePyramid
 from keras_cv.src.models.object_detection.faster_rcnn import RCNNHead
 from keras_cv.src.models.object_detection.faster_rcnn import RPNHead
@@ -356,10 +354,10 @@ class FasterRCNN(Task):
 
         self.roi_aligner = roi_aligner
         self.rcnn_head = rcnn_head
-        self._prediction_decoder = prediction_decoder or NonMaxSuppression(
-            bounding_box_format=bounding_box_format,
-            from_logits=False,
-            max_detections=num_max_decoder_detections,
+        self._prediction_decoder = prediction_decoder or DetectionGenerator(
+            nms_iou_threshold=0.5,
+            nms_confidence_threshold=0.5,
+            max_num_detections=100,
         )
         self.build(backbone.input_shape)
 
@@ -644,40 +642,16 @@ class FasterRCNN(Task):
         rois = _clip_boxes(rois, "yxyx", image_shape)
         box_pred, cls_pred = predictions["box"], predictions["classification"]
 
-        # box_pred is on "center_yxhw" format, convert to target format.
-        box_pred = _decode_deltas_to_boxes(
-            anchors=rois,
-            boxes_delta=box_pred,
-            anchor_format=self.roi_aligner.bounding_box_format,
-            box_format=self.bounding_box_format,
-            variance=BOX_VARIANCE,
-            image_shape=image_shape,
-        )
-
-        box_pred = convert_format(
-            box_pred,
-            source=self.bounding_box_format,
-            target=self.prediction_decoder.bounding_box_format,
-            image_shape=image_shape,
-        )
-        cls_pred = ops.softmax(cls_pred)
-        cls_pred = ops.slice(
-            cls_pred,
-            start_indices=[0, 0, 1],
-            shape=[cls_pred.shape[0], cls_pred.shape[1], cls_pred.shape[2] - 1],
-        )
-
         y_pred = self.prediction_decoder(
-            box_pred, cls_pred, image_shape=image_shape
-        )
-
-        y_pred["classes"] = ops.where(
-            y_pred["classes"] == -1, -1, y_pred["classes"] + 1
+            raw_boxes=box_pred,
+            raw_scores=cls_pred,
+            anchor_boxes=rois,
+            image_shape=image_shape,
         )
 
         y_pred["boxes"] = convert_format(
             y_pred["boxes"],
-            source=self.prediction_decoder.bounding_box_format,
+            source="yxyx",
             target=self.bounding_box_format,
             image_shape=image_shape,
         )
