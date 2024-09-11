@@ -33,6 +33,8 @@ class RPNHead(keras.layers.Layer):
             defaults to 3.
         num_filters: (Optional) number convolution filters
         kernel_size: (Optional) kernel size of the convolution filters.
+        conv_depth: (Optional) Number convolution layers before
+            object and class heads.
     """
 
     def __init__(
@@ -40,74 +42,66 @@ class RPNHead(keras.layers.Layer):
         num_anchors_per_location=3,
         num_filters=256,
         kernel_size=3,
+        conv_depth=1,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.num_anchors = num_anchors_per_location
-        self.num_filters = num_filters
-        self.kernel_size = kernel_size
+        self.convs = []
+        for _ in range(conv_depth):
+            self.convs.append(
+                keras.layers.Conv2D(
+                    num_filters,
+                    kernel_size=kernel_size,
+                    activation="relu",
+                    kernel_initializer=keras.initializers.RandomNormal(stddev=0.01)
+                )
+            )
 
-        self.conv = keras.layers.Conv2D(
-            filters=num_filters,
-            kernel_size=kernel_size,
-            strides=1,
-            padding="same",
-            activation="relu",
-            kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
-        )
+        self.seq_conv = keras.Sequential(self.convs)
+
         self.objectness_logits = keras.layers.Conv2D(
-            filters=self.num_anchors * 1,
+            filters=num_anchors_per_location * 1,
             kernel_size=1,
             strides=1,
             padding="valid",
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
         )
         self.anchor_deltas = keras.layers.Conv2D(
-            filters=self.num_anchors * 4,
+            filters=num_anchors_per_location * 4,
             kernel_size=1,
             strides=1,
             padding="valid",
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
         )
 
-    def call(self, feature_map, training=False):
-        def call_single_level(f_map):
-            # [BS, H, W, C]
-            t = self.conv(f_map, training=training)
-            # [BS, H, W, K]
-            rpn_scores = self.objectness_logits(t, training=training)
-            # [BS, H, W, K * 4]
-            rpn_boxes = self.anchor_deltas(t, training=training)
-            return rpn_boxes, rpn_scores
+        # === config ===
+        self.num_anchors = num_anchors_per_location
+        self.num_filters = num_filters
+        self.kernel_size = kernel_size
+        self.conv_depth = conv_depth
 
-        if not isinstance(feature_map, (dict, list, tuple)):
-            return call_single_level(feature_map)
-        elif isinstance(feature_map, (list, tuple)):
-            rpn_boxes = []
-            rpn_scores = []
-            for f_map in feature_map:
-                rpn_box, rpn_score = call_single_level(f_map)
-                rpn_boxes.append(rpn_box)
-                rpn_scores.append(rpn_score)
-            return rpn_boxes, rpn_scores
-        else:
-            rpn_boxes = {}
-            rpn_scores = {}
-            for lvl, f_map in feature_map.items():
-                rpn_box, rpn_score = call_single_level(f_map)
-                rpn_boxes[lvl] = rpn_box
-                rpn_scores[lvl] = rpn_score
-            return rpn_boxes, rpn_scores
+    def call(self, feature_map, training=False):
+        rpn_boxes = {}
+        rpn_scores = {}
+        for level in feature_map:
+            x = feature_map[level]
+            x = self.seq_conv(x)
+            rpn_scores[level] = self.objectness_logits(x)
+            rpn_boxes[level] = self.anchor_deltas(x)
+        return rpn_boxes, rpn_scores
 
     def get_config(self):
         config = super().get_config()
         config["num_anchors_per_location"] = self.num_anchors
         config["num_filters"] = self.num_filters
         config["kernel_size"] = self.kernel_size
+        config["conv_depth"] = self.conv_depth
         return config
 
     def build(self, input_shape):
-        self.conv.build((None, None, None, self.num_filters))
+        for conv in self.convs:
+            conv.build((None, None, None, self.num_filters))
+
         self.objectness_logits.build((None, None, None, self.num_filters))
         self.anchor_deltas.build((None, None, None, self.num_filters))
         self.built = True
