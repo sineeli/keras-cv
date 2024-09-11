@@ -52,15 +52,14 @@ class RCNNHead(keras.layers.Layer):
                 activation="relu",
             )
             self.convs.append(layer)
+
         self.fcs = []
         for fc_dim in fc_dims:
-            layer = keras.layers.Dense(
-                units=fc_dim,
-                activation="relu",
-            )
+            layer = keras.layers.Dense(units=fc_dim, activation="relu")
             self.fcs.append(layer)
+
         self.box_pred = keras.layers.Dense(
-            units=4,
+            units=4 * (num_classes + 1),
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
         )
         self.cls_score = keras.layers.Dense(
@@ -69,26 +68,36 @@ class RCNNHead(keras.layers.Layer):
         )
 
     def call(self, feature_map, training=False):
-        x = feature_map
+        roi_features = feature_map
+        _, num_rois, height, width, filters = roi_features.shape
+
+        x = keras.ops.reshape(roi_features, [-1, height, width, filters])
+
         for conv in self.convs:
             x = conv(x, training=training)
+
+        _, _, _, filters = x.shape
+        x = keras.ops.reshape(x, [-1, num_rois, height * width * filters])
+        # Fully connected layers
         for fc in self.fcs:
             x = fc(x, training=training)
+
         rcnn_boxes = self.box_pred(x, training=training)
         rcnn_scores = self.cls_score(x, training=training)
         return rcnn_boxes, rcnn_scores
 
     def build(self, input_shape):
-        intermediate_shape = input_shape
-        if self.conv_dims:
-            for idx in range(len(self.convs)):
-                self.convs[idx].build(intermediate_shape)
-                intermediate_shape = tuple(intermediate_shape[:-1]) + (
-                    self.conv_dims[idx],
-                )
+        _, num_rois, height, width, filters = input_shape
+        intermediate_shape = (None, height, width, filters)
+        for idx, conv in enumerate(self.convs):
+            conv.build(intermediate_shape)
+            intermediate_shape = tuple(intermediate_shape[:-1]) + (
+                self.conv_dims[idx],
+            )
 
-        for idx in range(len(self.fc_dims)):
-            self.fcs[idx].build(intermediate_shape)
+        intermediate_shape = (None, num_rois, height * width * filters)
+        for idx, fc in enumerate(self.fc_dims):
+            fc.build(intermediate_shape)
             intermediate_shape = tuple(intermediate_shape[:-1]) + (
                 self.fc_dims[idx],
             )
@@ -97,6 +106,13 @@ class RCNNHead(keras.layers.Layer):
         self.cls_score.build(intermediate_shape)
 
         self.built = True
+
+    def compute_output_shape(self, input_shape):
+        return (None, None, 4 * (self.num_classes + 1)), (
+            None,
+            None,
+            (self.num_classes + 1),
+        )
 
     def get_config(self):
         config = super().get_config()
