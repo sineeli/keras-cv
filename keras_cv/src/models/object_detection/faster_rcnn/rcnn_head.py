@@ -39,19 +39,22 @@ class RCNNHead(keras.layers.Layer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.num_classes = num_classes
-        self.conv_dims = conv_dims
-        self.fc_dims = fc_dims
+
         self.convs = []
+        self.norms = []
+        self.activation = keras.layers.Activation("relu")
         for conv_dim in conv_dims:
-            layer = keras.layers.Conv2D(
+            conv = keras.layers.Conv2D(
                 filters=conv_dim,
                 kernel_size=3,
                 strides=1,
                 padding="same",
-                activation="relu",
+                kernel_initializer=keras.initializers.VarianceScaling(
+                    scale=2, mode="fan_out", distribution="untruncated_normal"
+                ),
             )
-            self.convs.append(layer)
+            self.convs.append(conv)
+            self.norms.append(keras.layers.BatchNormalization())
 
         self.fcs = []
         for fc_dim in fc_dims:
@@ -67,14 +70,21 @@ class RCNNHead(keras.layers.Layer):
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
         )
 
+        # === config ===
+        self.num_classes = num_classes
+        self.conv_dims = conv_dims
+        self.fc_dims = fc_dims
+
     def call(self, feature_map, training=False):
         roi_features = feature_map
         _, num_rois, height, width, filters = roi_features.shape
 
         x = keras.ops.reshape(roi_features, [-1, height, width, filters])
 
-        for conv in self.convs:
+        for conv, bn in zip(self.convs, self.norms):
             x = conv(x, training=training)
+            x = bn(x)
+            x = self.activation(x)
 
         _, _, _, filters = x.shape
         x = keras.ops.reshape(x, [-1, num_rois, height * width * filters])
@@ -89,11 +99,12 @@ class RCNNHead(keras.layers.Layer):
     def build(self, input_shape):
         _, num_rois, height, width, filters = input_shape
         intermediate_shape = (None, height, width, filters)
-        for idx, conv in enumerate(self.convs):
+        for idx, conv, bn in enumerate(zip(self.convs, self.norms)):
             conv.build(intermediate_shape)
             intermediate_shape = tuple(intermediate_shape[:-1]) + (
                 self.conv_dims[idx],
             )
+            bn.build(intermediate_shape)
 
         intermediate_shape = (None, num_rois, height * width * filters)
         for idx, fc in enumerate(self.fc_dims):

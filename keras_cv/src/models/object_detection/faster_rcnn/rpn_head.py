@@ -53,7 +53,9 @@ class RPNHead(keras.layers.Layer):
                     num_filters,
                     kernel_size=kernel_size,
                     activation="relu",
-                    kernel_initializer=keras.initializers.RandomNormal(stddev=0.01)
+                    kernel_initializer=keras.initializers.RandomNormal(
+                        stddev=0.01
+                    ),
                 )
             )
 
