@@ -40,7 +40,6 @@ class FasterRCNNTest(TestCase):
             backbone=keras_cv.models.ResNet18V2Backbone(
                 input_shape=(32, 32, 3)
             ),
-            num_sampled_rois=256,
         )
         faster_rcnn.compile(
             optimizer=keras.optimizers.Adam(),

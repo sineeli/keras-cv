@@ -107,7 +107,7 @@ class RCNNHead(keras.layers.Layer):
             bn.build(intermediate_shape)
 
         intermediate_shape = (None, num_rois, height * width * filters)
-        for idx, fc in enumerate(self.fc_dims):
+        for idx, fc in enumerate(self.fcs):
             fc.build(intermediate_shape)
             intermediate_shape = tuple(intermediate_shape[:-1]) + (
                 self.fc_dims[idx],

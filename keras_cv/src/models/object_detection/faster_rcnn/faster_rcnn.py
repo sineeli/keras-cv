@@ -166,7 +166,7 @@ class FasterRCNN(Task):
         anchor_aspect_ratios=[0.5, 1.0, 2.0],
         feature_pyramid=None,
         min_level=2,
-        max_level=6,
+        max_level=5,
         rpn_head=None,
         rpn_filters=256,
         rpn_kernel_size=3,
@@ -178,8 +178,7 @@ class FasterRCNN(Task):
         num_sampled_rois=512,
         label_encoder=None,
         prediction_decoder=None,
-        num_max_decoder_detections=100,
-        *args,
+        max_num_detections=100,
         **kwargs,
     ):
         # Backbone
@@ -199,7 +198,6 @@ class FasterRCNN(Task):
         feature_pyramid = feature_pyramid or FeaturePyramid(
             min_level=min_level,
             max_level=max_level,
-            backbone_max_level=backbone_max_level,
         )
 
         # Anchors
@@ -290,7 +288,7 @@ class FasterRCNN(Task):
             variance=BOX_VARIANCE,
         )
 
-        rois, roi_scores = roi_generator(decoded_rpn_boxes, rpn_scores)
+        rois, _ = roi_generator(decoded_rpn_boxes, rpn_scores)
         rois = _clip_boxes(rois, "yxyx", image_shape)
 
         feature_map = roi_aligner(features=feature_map, boxes=rois)
@@ -348,8 +346,8 @@ class FasterRCNN(Task):
         self.rcnn_head = rcnn_head
         self._prediction_decoder = prediction_decoder or DetectionGenerator(
             nms_iou_threshold=0.5,
-            nms_confidence_threshold=0.5,
-            max_num_detections=100,
+            nms_confidence_threshold=0.05,
+            max_num_detections=max_num_detections,
         )
         self.build(backbone.input_shape)
 

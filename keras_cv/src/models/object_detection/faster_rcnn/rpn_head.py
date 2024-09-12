@@ -51,6 +51,8 @@ class RPNHead(keras.layers.Layer):
             self.convs.append(
                 keras.layers.Conv2D(
                     num_filters,
+                    strides=1,
+                    padding="same",
                     kernel_size=kernel_size,
                     activation="relu",
                     kernel_initializer=keras.initializers.RandomNormal(
