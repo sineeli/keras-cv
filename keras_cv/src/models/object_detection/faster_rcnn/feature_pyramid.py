@@ -126,7 +126,7 @@ class FeaturePyramid(keras.layers.Layer):
                     kernel_size=1,
                     strides=1,
                     padding="same",
-                    name=f"lateral_P{i}",
+                    name=f"fpn_lateral_P{i}",
                 )
         else:
             self._validate_user_layers(lateral_layers, "lateral_layers")
@@ -141,7 +141,7 @@ class FeaturePyramid(keras.layers.Layer):
                     kernel_size=3,
                     strides=1,
                     padding="same",
-                    name=f"output_P{i}",
+                    name=f"fpn_output_P{i}",
                 )
         else:
             self._validate_user_layers(output_layers, "output_layers")
@@ -150,11 +150,16 @@ class FeaturePyramid(keras.layers.Layer):
         # top of the last feature map
         # Use max pooling to simulate stride 2 subsampling
         self.max_pool = keras.layers.MaxPool2D(
-            pool_size=(1, 1), strides=2, padding="same"
+            pool_size=(1, 1),
+            strides=2,
+            padding="same",
+            name="fpn_output_max_pool",
         )
 
         # the same upsampling layer is used for all levels
-        self.top_down_op = keras.layers.UpSampling2D(size=2)
+        self.top_down_op = keras.layers.UpSampling2D(
+            size=2, name="fpn_up_sample"
+        )
         # the same merge layer is used for all levels
         self.merge_op = keras.layers.Add()
 

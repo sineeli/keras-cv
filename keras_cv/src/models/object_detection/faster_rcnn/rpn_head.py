@@ -47,7 +47,7 @@ class RPNHead(keras.layers.Layer):
     ):
         super().__init__(**kwargs)
         self.convs = []
-        for _ in range(conv_depth):
+        for idx in range(conv_depth):
             self.convs.append(
                 keras.layers.Conv2D(
                     num_filters,
@@ -58,6 +58,7 @@ class RPNHead(keras.layers.Layer):
                     kernel_initializer=keras.initializers.RandomNormal(
                         stddev=0.01
                     ),
+                    name=f"rpn_head_conv_{idx}",
                 )
             )
 
@@ -69,6 +70,7 @@ class RPNHead(keras.layers.Layer):
             strides=1,
             padding="valid",
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
+            name="rpn_head_cls_logits",
         )
         self.anchor_deltas = keras.layers.Conv2D(
             filters=num_anchors_per_location * 4,
@@ -76,6 +78,7 @@ class RPNHead(keras.layers.Layer):
             strides=1,
             padding="valid",
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
+            name="rpn_head_bbox_pred",
         )
 
         # === config ===
