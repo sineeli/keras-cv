@@ -43,7 +43,7 @@ class RCNNHead(keras.layers.Layer):
         self.convs = []
         self.norms = []
         self.activation = keras.layers.Activation("relu")
-        for conv_dim in conv_dims:
+        for idx, conv_dim in enumerate(conv_dims):
             conv = keras.layers.Conv2D(
                 filters=conv_dim,
                 kernel_size=3,
@@ -52,22 +52,25 @@ class RCNNHead(keras.layers.Layer):
                 kernel_initializer=keras.initializers.VarianceScaling(
                     scale=2, mode="fan_out", distribution="untruncated_normal"
                 ),
+                nam=f"conv_{idx}"
             )
             self.convs.append(conv)
-            self.norms.append(keras.layers.BatchNormalization())
+            self.norms.append(keras.layers.BatchNormalization(name=f"bn_{idx}"))
 
         self.fcs = []
-        for fc_dim in fc_dims:
-            layer = keras.layers.Dense(units=fc_dim, activation="relu")
+        for idx, fc_dim in enumerate(fc_dims):
+            layer = keras.layers.Dense(units=fc_dim, activation="relu", name=f"fc_{idx}")
             self.fcs.append(layer)
 
         self.box_pred = keras.layers.Dense(
             units=4 * (num_classes + 1),
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
+            name="bbox_pred"
         )
         self.cls_score = keras.layers.Dense(
             units=num_classes + 1,
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
+            name="cls_score"
         )
 
         # === config ===
