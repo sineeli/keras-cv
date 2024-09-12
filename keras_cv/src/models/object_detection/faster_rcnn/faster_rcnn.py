@@ -220,6 +220,7 @@ class FasterRCNN(Task):
             num_anchors_per_location=num_anchors_per_location,
             num_filters=rpn_filters,
             kernel_size=rpn_kernel_size,
+            name="rpn_head"
         )
 
         # RoI Generator
