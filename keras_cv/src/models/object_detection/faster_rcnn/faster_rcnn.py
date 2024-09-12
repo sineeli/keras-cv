@@ -191,13 +191,14 @@ class FasterRCNN(Task):
             backbone.pyramid_level_inputs[i] for i in extractor_levels
         ]
         feature_extractor = get_feature_extractor(
-            backbone, extractor_layer_names, extractor_levels
+            backbone, extractor_layer_names, extractor_levels, name="backbone"
         )
 
         # Feature Pyramid
         feature_pyramid = feature_pyramid or FeaturePyramid(
             min_level=min_level,
             max_level=max_level,
+            name="fpn"
         )
 
         # Anchors

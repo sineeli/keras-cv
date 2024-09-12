@@ -56,7 +56,7 @@ def convert_inputs_to_tf_dataset(
     return dataset
 
 
-def get_feature_extractor(model, layer_names, output_keys=None):
+def get_feature_extractor(model, layer_names, output_keys=None, name=None):
     """Create a feature extractor model with augmented output.
 
     This method produces a new `keras.Model` with the same input signature
@@ -79,4 +79,4 @@ def get_feature_extractor(model, layer_names, output_keys=None):
         output_keys = layer_names
     items = zip(output_keys, layer_names)
     outputs = {key: model.get_layer(name).output for key, name in items}
-    return keras.Model(inputs=model.inputs, outputs=outputs)
+    return keras.Model(inputs=model.inputs, outputs=outputs, name=name)
