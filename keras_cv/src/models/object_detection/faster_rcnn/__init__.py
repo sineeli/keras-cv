@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from keras_cv.src.models.object_detection.faster_rcnn.detection_generator import (  # noqa : E501
+    DetectionGenerator,
+)
 from keras_cv.src.models.object_detection.faster_rcnn.feature_pyramid import (
     FeaturePyramid,
 )
