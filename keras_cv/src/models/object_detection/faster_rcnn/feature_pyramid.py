@@ -126,7 +126,7 @@ class FeaturePyramid(keras.layers.Layer):
                     kernel_size=1,
                     strides=1,
                     padding="same",
-                    name=f"lateral_P{i}",
+                    name=f"lateral_{i}",
                 )
         else:
             self._validate_user_layers(lateral_layers, "lateral_layers")
@@ -141,7 +141,7 @@ class FeaturePyramid(keras.layers.Layer):
                     kernel_size=3,
                     strides=1,
                     padding="same",
-                    name=f"output_P{i}",
+                    name=f"output_{i}",
                 )
         else:
             self._validate_user_layers(output_layers, "output_layers")
