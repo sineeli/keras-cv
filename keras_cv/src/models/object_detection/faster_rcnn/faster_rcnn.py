@@ -166,7 +166,7 @@ class FasterRCNN(Task):
         anchor_aspect_ratios=[0.5, 1.0, 2.0],
         feature_pyramid=None,
         min_level=2,
-        max_level=5,
+        max_level=6,
         rpn_head=None,
         rpn_filters=256,
         rpn_kernel_size=3,
@@ -197,7 +197,7 @@ class FasterRCNN(Task):
         # Feature Pyramid
         feature_pyramid = feature_pyramid or FeaturePyramid(
             min_level=min_level,
-            max_level=max_level,
+            max_level=backbone_max_level,
             name="fpn"
         )
 
