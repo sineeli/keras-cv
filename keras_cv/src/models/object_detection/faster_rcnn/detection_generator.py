@@ -71,9 +71,9 @@ def generate_detections(
     nmsed_idx, valid_det = non_max_suppression(
         nmsed_boxes,
         nmsed_scores,
-        max_output_size=100,
-        iou_threshold=0.5,
-        score_threshold=0.5,
+        max_output_size=max_num_detections,
+        iou_threshold=nms_iou_threshold,
+        score_threshold=nms_confidence_threshold,
     )
     boxes = ops.take_along_axis(
         nmsed_boxes, ops.expand_dims(nmsed_idx, axis=-1), axis=1
