@@ -39,31 +39,44 @@ class RCNNHead(keras.layers.Layer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.num_classes = num_classes
-        self.conv_dims = conv_dims
-        self.fc_dims = fc_dims
+
         self.convs = []
-        for conv_dim in conv_dims:
-            layer = keras.layers.Conv2D(
+        self.norms = []
+        self.activation = keras.layers.Activation("relu")
+        for idx, conv_dim in enumerate(conv_dims):
+            conv = keras.layers.Conv2D(
                 filters=conv_dim,
                 kernel_size=3,
                 strides=1,
                 padding="same",
-                activation="relu",
+                kernel_initializer=keras.initializers.VarianceScaling(
+                    scale=2, mode="fan_out", distribution="untruncated_normal"
+                ),
+                nam=f"conv_{idx}"
             )
-            self.convs.append(layer)
+            self.convs.append(conv)
+            self.norms.append(keras.layers.BatchNormalization(name=f"bn_{idx}"))
 
         self.fcs = []
-        for fc_dim in fc_dims:
-            layer = keras.layers.Dense(units=fc_dim, activation="relu")
+        for idx, fc_dim in enumerate(fc_dims):
+            layer = keras.layers.Dense(units=fc_dim, activation="relu", name=f"fc_{idx}")
             self.fcs.append(layer)
 
         self.box_pred = keras.layers.Dense(
             units=4 * (num_classes + 1),
+            kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
+            name="bbox_pred"
         )
         self.cls_score = keras.layers.Dense(
             units=num_classes + 1,
+            kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
+            name="cls_score"
         )
+
+        # === config ===
+        self.num_classes = num_classes
+        self.conv_dims = conv_dims
+        self.fc_dims = fc_dims
 
     def call(self, feature_map, training=False):
         roi_features = feature_map
@@ -71,8 +84,10 @@ class RCNNHead(keras.layers.Layer):
 
         x = keras.ops.reshape(roi_features, [-1, height, width, filters])
 
-        for conv in self.convs:
+        for conv, bn in zip(self.convs, self.norms):
             x = conv(x, training=training)
+            x = bn(x)
+            x = self.activation(x)
 
         _, _, _, filters = x.shape
         x = keras.ops.reshape(x, [-1, num_rois, height * width * filters])
@@ -87,15 +102,16 @@ class RCNNHead(keras.layers.Layer):
     def build(self, input_shape):
         _, num_rois, height, width, filters = input_shape
         intermediate_shape = (None, height, width, filters)
-        for idx in range(len(self.convs)):
-            self.convs[idx].build(intermediate_shape)
+        for idx, conv, bn in enumerate(zip(self.convs, self.norms)):
+            conv.build(intermediate_shape)
             intermediate_shape = tuple(intermediate_shape[:-1]) + (
                 self.conv_dims[idx],
             )
+            bn.build(intermediate_shape)
 
         intermediate_shape = (None, num_rois, height * width * filters)
-        for idx in range(len(self.fc_dims)):
-            self.fcs[idx].build(intermediate_shape)
+        for idx, fc in enumerate(self.fcs):
+            fc.build(intermediate_shape)
             intermediate_shape = tuple(intermediate_shape[:-1]) + (
                 self.fc_dims[idx],
             )
