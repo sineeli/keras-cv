@@ -356,7 +356,7 @@ class FasterRCNN(Task):
         self.rcnn_head = rcnn_head
         self._prediction_decoder = prediction_decoder or DetectionGenerator(
             nms_iou_threshold=0.5,
-            nms_confidence_threshold=0.5,
+            nms_confidence_threshold=0.05,
             max_num_detections=100,
         )
         self.build(backbone.input_shape)
