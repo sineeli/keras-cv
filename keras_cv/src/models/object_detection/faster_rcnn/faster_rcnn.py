@@ -489,9 +489,6 @@ class FasterRCNN(Task):
             rpn_per_level_box_weights.append(box_weights_normalized)
             start_idx = start_idx + end_idx
 
-        rpn_box_weights = ops.concatenate(rpn_per_level_box_weights, axis=1)
-        rpn_cls_weights /= self.label_encoder.samples_per_image * local_batch
-
         # Call Backbone, FPN and RPN Head
         backbone_outputs = self.feature_extractor(images)
         feature_map = self.feature_pyramid(backbone_outputs)
@@ -543,10 +540,11 @@ class FasterRCNN(Task):
         ) = self.roi_sampler(rois, gt_boxes, gt_classes)
 
         cls_targets = ops.squeeze(cls_targets, axis=-1)
-        cls_weights = ops.squeeze(cls_weights, axis=-1)
 
         # Box and class weights -- exclusive to compute loss
-        box_weights = ops.divide_no_nan(box_weights, ops.sum(box_weights))
+        box_weights = ops.divide_no_nan(
+            box_weights, ops.sum(ops.tile(box_weights, [1, 1, 4]))
+        )
         cls_targets = ops.one_hot(cls_targets, num_classes=self.num_classes + 1)
 
         # Call RoI Aligner and RCNN Head
@@ -563,6 +561,9 @@ class FasterRCNN(Task):
             box_pred, [-1, num_rois, (self.num_classes + 1), 4]
         )
         box_pred = ops.einsum("bnij,bni->bnj", box_pred, cls_targets)
+
+        rpn_box_weights = ops.concatenate(rpn_per_level_box_weights, axis=1)
+        rpn_cls_weights /= ops.shape(box_pred)[1] * local_batch
 
         y_true = {
             "rpn_box": rpn_box_targets,
