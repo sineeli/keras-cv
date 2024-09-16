@@ -58,7 +58,7 @@ class RPNHead(keras.layers.Layer):
                     kernel_initializer=keras.initializers.RandomNormal(
                         stddev=0.01
                     ),
-                    name=f"conv_{idx}"
+                    name=f"conv_{idx}",
                 )
             )
 
@@ -70,7 +70,7 @@ class RPNHead(keras.layers.Layer):
             strides=1,
             padding="valid",
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
-            name="cls_logits"
+            name="cls_logits",
         )
         self.anchor_deltas = keras.layers.Conv2D(
             filters=num_anchors_per_location * 4,
@@ -78,7 +78,7 @@ class RPNHead(keras.layers.Layer):
             strides=1,
             padding="valid",
             kernel_initializer=keras.initializers.RandomNormal(stddev=0.01),
-            name="bbox_pred"
+            name="bbox_pred",
         )
 
         # === config ===
