@@ -197,7 +197,8 @@ class FasterRCNN(Task):
         # Feature Pyramid
         feature_pyramid = feature_pyramid or FeaturePyramid(
             min_level=min_level,
-            max_level=backbone_max_level,
+            max_level=max_level,
+            backbone_max_level=backbone_max_level,
             name="fpn"
         )
 
