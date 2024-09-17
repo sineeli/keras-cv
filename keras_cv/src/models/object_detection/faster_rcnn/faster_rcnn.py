@@ -477,10 +477,29 @@ class FasterRCNN(Task):
             gt_classes=gt_classes,
         )
 
-        rpn_box_weights /= (
-            self.label_encoder.samples_per_image * local_batch
-        )
-        rpn_cls_weights /= self.label_encoder.samples_per_image * local_batch
+        start_idx = 0
+        rpn_per_level_box_weights = []
+        for lvl in anchors:
+            end_idx = anchors[lvl].shape[0]
+            rpn_box_level_weights = rpn_cls_weights[
+                :, start_idx : start_idx + end_idx, :
+            ]
+            rpn_box_level_targets = rpn_box_targets[
+                :, start_idx : start_idx + end_idx, :
+            ]
+            valid_mask = ops.any(ops.abs(rpn_box_level_targets) > 1e-6, axis=-1)
+            # (batch_size, height * width * num_anchors, 4)
+            valid_mask = ops.cast(
+                ops.repeat(valid_mask, 4, axis=-1),
+                dtype=rpn_box_level_targets.dtype,
+            )
+            normalizer = ops.sum(valid_mask)
+            box_weights_normalized = ops.divide_no_nan(
+                rpn_box_level_weights, normalizer
+            )
+            rpn_per_level_box_weights.append(box_weights_normalized)
+            start_idx = start_idx + end_idx
+
         # Call Backbone, FPN and RPN Head
         backbone_outputs = self.feature_extractor(images)
         feature_map = self.feature_pyramid(backbone_outputs)
@@ -531,6 +550,9 @@ class FasterRCNN(Task):
             cls_weights,
         ) = self.roi_sampler(rois, gt_boxes, gt_classes)
 
+        mask = ops.tile(ops.greater(cls_targets, 0), [1, 1, 4])
+        mask = ops.cast(mask, dtype=box_targets.dtype)
+
         cls_targets = ops.squeeze(cls_targets, axis=-1)
         cls_targets = ops.one_hot(cls_targets, num_classes=self.num_classes + 1)
 
@@ -550,7 +572,10 @@ class FasterRCNN(Task):
         box_pred = ops.einsum("bnij,bni->bnj", box_pred, cls_targets)
 
         # Box and class weights -- exclusive to compute loss
-        box_weights /= ops.shape(box_pred)[1] * local_batch
+        box_weights /= ops.sum(mask)
+
+        rpn_box_weights = ops.concatenate(rpn_per_level_box_weights, axis=1)
+        rpn_cls_weights /= ops.shape(box_pred)[1] * local_batch
 
         y_true = {
             "rpn_box": rpn_box_targets,
