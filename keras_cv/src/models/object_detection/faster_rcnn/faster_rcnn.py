@@ -529,7 +529,7 @@ class FasterRCNN(Task):
         cls_targets = ops.squeeze(cls_targets, axis=-1)
 
         # Box and class weights -- exclusive to compute loss
-        box_weights /= ops.shape(box_targets)[1] * local_batch * 0.25
+        box_weights /= self.roi_sampler.num_sampled_rois * local_batch * 0.25
         cls_targets = ops.one_hot(cls_targets, num_classes=self.num_classes + 1)
 
         # Call RoI Aligner and RCNN Head
